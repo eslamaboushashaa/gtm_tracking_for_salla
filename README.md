@@ -1,2 +1,7 @@
 # gtm_tracking_for_salla
-A collection of prompts and skills for implementing tracking pixels from various advertising platforms on Salla stores.
+
+Prompts and skills that let an LLM agent set up ad-platform tracking through Google Tag Manager on **Salla** stores.
+
+| Platform | Folder |
+|---|---|
+| ChatGPT Ads (OpenAI pixel) | [`chatgpt/`](chatgpt/) |
