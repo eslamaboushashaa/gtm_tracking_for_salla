@@ -4,7 +4,7 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 
 ## WHAT YOU ARE BUILDING (fixed spec)
 
-**10 tags** on the installed Snapchat "Snap Pixel" gallery template (+1 conditional, Step 8c):
+**9 tags** on the installed Snapchat "Snap Pixel" gallery template (+1 conditional, Step 8c):
 
 | Tag name | Snap `event_type` | Fires on (Salla dataLayer event) | Data coverage |
 |---|---|---|---|
@@ -15,7 +15,6 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 | `EA - Snap Pixel - ADD_TO_WISHLIST` | `ADD_TO_WISHLIST` | `Product Added to Wishlist` (success = true) | ⚠️ event only — no product data |
 | `EA - Snap Pixel - ADD_CART` | `ADD_CART` | `Product Added` | ✅ full |
 | `EA - Snap Pixel - START_CHECKOUT` | `START_CHECKOUT` | `checkout::started` | ⚠️ value + currency only |
-| `EA - Snap Pixel - ADD_BILLING` | `ADD_BILLING` | `payments::apple-pay.start-transaction` | ⚠️ Apple Pay only |
 | `EA - Snap Pixel - PURCHASE` | `PURCHASE` | `Order Completed` | ✅ full |
 | `EA - Snap Pixel - LOGIN` | `LOGIN` | `auth::logged.in` (success = true) | ✅ **Snap-only** |
 | *(conditional)* `EA - Snap Pixel - ADD_CART - Bought Together` | `ADD_CART` | `salla-bought-together::product.added` | only if the bought-together check fails |
@@ -44,7 +43,7 @@ Event list taken from the Snap Pixel GTM template's own `event_type` options (th
 | ADD_TO_WISHLIST | `Product Added to Wishlist` | ⚠️ Build — no product data in Salla's push |
 | ADD_CART | `Product Added` | ✅ Build |
 | START_CHECKOUT | `checkout::started` | ⚠️ Build — value/currency only |
-| ADD_BILLING | `payments::apple-pay.start-transaction` | ⚠️ Build — Apple Pay only |
+| ADD_BILLING | `payments::apple-pay.start-transaction` | ❌ Not built — Salla only pushes it for Apple Pay's "Pay now"; card and mada payments send nothing, so the event would count a fraction of payments and mislead optimisation |
 | PURCHASE | `Order Completed` | ✅ Build |
 | LOGIN | `auth::logged.in` | ✅ Build — filtered to `success: true` |
 | SIGN_UP | — | ❌ Salla's OTP flow can't distinguish a signup from a login |
@@ -150,7 +149,7 @@ dataLayer.push({
 2. **Salla never clears `"0"` between pushes.** GTM merges each push into its data model, so a field from an earlier push survives into a later one unless overwritten. Example: `0.value` from `Product Viewed` is still there when `Product Added` fires. **Always compute from fields present in the current push** — add-to-cart value is `price × quantity`, never `0.value`.
 3. `Product Added` has **no currency** and sends **quantity as a string** (`"1"`). Cast with `Number()`.
 4. `checkout::started` carries **no product IDs or items**.
-5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**.
+5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**. That is why no skill in this repo builds a payment-info event (AddPaymentInfo / ADD_BILLING): it would count only Apple Pay buyers.
 6. **Three things look like a purchase — build on exactly one:** `Order Completed`. Never also `purchase` (legacy push) or `mobile::order.placed` (fired 27× in one test session).
 7. The `customer` object arrives only in the `purchase` push, which fires *before* `Order Completed` on the same page, so its fields are still in the data model when Order Completed fires. On product/cart/search pages the customer fields are normally **undefined** — expected.
 8. Salla sends email/phone **plain and hashed**. Verified by hashing sample values: `email_hashed` = SHA-256 of the lowercased email; `phone_hashed` = SHA-256 of the digits with country code and no `+` (`966…`); `phone_with_plus_hashed` = SHA-256 of `+966…`. `first_name`/`last_name` are **already SHA-256** with unverified normalisation (no plain version). `customer.name` is the plain full name — **never send it anywhere.**
@@ -184,7 +183,6 @@ All Salla skills in this repo use these **exact names**. Whichever runs first cr
 | `EA - Core - salla_item_currency` | `0.currency` | all |
 | `EA - Core - salla_event_currency` | `currency` | all |
 | `EA - Core - salla_checkout_value` | `value` | all |
-| `EA - Core - salla_payment_amount` | `amount` | Meta, TikTok, Snap |
 | `EA - Core - salla_order_id` | `0.order_id` | all |
 | `EA - Core - salla_order_prices_total` | `0.prices.total` | all |
 | `EA - Core - salla_order_subtotal` | `0.subtotal` | all |
@@ -301,7 +299,6 @@ Name a new trigger `EA - Trigger - <dataLayer event name>`. Reuse an existing on
 | `EA - Trigger - Product Viewed` | `Product Viewed` | — | all |
 | `EA - Trigger - Product Added` | `Product Added` | — | all |
 | `EA - Trigger - checkout::started` | `checkout::started` | — | all |
-| `EA - Trigger - payments::apple-pay.start-transaction` | `payments::apple-pay.start-transaction` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Order Completed` | `Order Completed` | `{{EA - Core - salla_order_id}}` matches RegEx `^\d+$` | all |
 | `EA - Trigger - Products Searched` | `Products Searched` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Product Added to Wishlist` | `Product Added to Wishlist` | `{{EA - Core - salla_success}}` equals `true` | Meta, TikTok, Snap |
@@ -385,7 +382,7 @@ List triggers, variables and tags — **every page** (20 per page).
 `EA - Snap Pixel`; `EA - Core` if missing.
 
 ### Step 6 — Salla foundation
-Create what Snap uses and is missing: DLVs marked *all* / *Snap*, `EA - Core - salla_success`, `EA - Core - salla_impressions`, the constant, the non-conditional Custom JS, and **all nine** non-conditional triggers (Snap is the only skill that uses `auth::logged.in` and `impressions`). Conditional items only per the bought-together check.
+Create what Snap uses and is missing: DLVs marked *all* / *Snap*, `EA - Core - salla_success`, `EA - Core - salla_impressions`, the constant, the non-conditional Custom JS, and **all eight** non-conditional triggers (Snap is the only skill that uses `auth::logged.in` and `impressions`). Conditional items only per the bought-together check.
 
 ### Step 7 — Snap variables (folder `EA - Snap Pixel`)
 
@@ -412,13 +409,6 @@ function() {
 }
 ```
 
-`EA - Snap Pixel - payment_info_available`
-```js
-function() {
-  return 1;
-}
-```
-
 ### Step 8 — Tags
 
 In the tables below, *Trigger* names the Salla dataLayer event: use the trigger found or created for it in Step 4/6 (reused, or `EA - Trigger - <event>`), referenced by its trigger ID. Create everything in Steps 5–8 with one `gtm_workspace` `bulkUpdate` where the server supports it — temporary IDs (`new_1`, `new_2`, …) let new tags reference new triggers and folders in the same call.
@@ -441,7 +431,6 @@ In the tables below, *Trigger* names the Salla dataLayer event: use the trigger 
 | ADD_TO_WISHLIST | `ADD_TO_WISHLIST` | `Product Added to Wishlist` | — *(no product data exists)* |
 | ADD_CART | `ADD_CART` | `Product Added` | `item_ids`=`{{EA - Core - salla_product_ids}}`, `item_category`=`{{EA - Core - salla_product_category}}`, `description`=`{{EA - Core - salla_product_name}}`, `price`=`{{EA - Core - salla_add_to_cart_value}}`, `number_items`=`{{EA - Snap Pixel - product_quantity}}`, `currency`=`{{EA - Core - salla_currency}}` |
 | START_CHECKOUT | `START_CHECKOUT` | `checkout::started` | `price`=`{{EA - Core - salla_checkout_value}}`, `currency`=`{{EA - Core - salla_currency}}` |
-| ADD_BILLING | `ADD_BILLING` | `payments::apple-pay.start-transaction` | `price`=`{{EA - Core - salla_payment_amount}}`, `currency`=`{{EA - Core - salla_currency}}`, `payment_info_available`=`{{EA - Snap Pixel - payment_info_available}}` |
 | PURCHASE | `PURCHASE` | `Order Completed` | `item_ids`=`{{EA - Core - salla_order_item_ids}}`, `price`=`{{EA - Core - salla_order_value}}`, `number_items`=`{{EA - Core - salla_order_num_items}}`, `currency`=`{{EA - Core - salla_currency}}`, `transaction_id`=`{{EA - Core - salla_order_id}}`, `client_dedup_id`=`{{EA - Core - salla_order_id}}` |
 | LOGIN | `LOGIN` | `auth::logged.in` | — |
 
@@ -451,7 +440,7 @@ In the tables below, *Trigger* names the Salla dataLayer event: use the trigger 
 Only if the bought-together check showed **no** `Product Added`. Tag `EA - Snap Pixel - ADD_CART - Bought Together`: `event_type` `ADD_CART`, trigger `salla-bought-together::product.added`, `item_ids`=`{{EA - Core - salla_bt_product_ids}}`, `item_category`=`{{EA - Core - salla_bt_product_category}}`, `description`=`{{EA - Core - salla_bt_product_name}}`, `price`=`{{EA - Core - salla_bt_product_price}}`, `number_items`=`1`, `currency`=`{{EA - Core - salla_currency}}`. Quantity is 1 because the widget push carries no added-quantity field.
 
 ### Step 9 — Verify
-`gtm_folder action=entities` on both folders; 10 tags (11 with the conditional); every variable/trigger foldered; every `{{...}}` matches an existing variable. Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
+`gtm_folder action=entities` on both folders; 9 tags (10 with the conditional); every variable/trigger foldered; every `{{...}}` matches an existing variable. Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
 
 ### Step 10 — Report and stop
 IDs, template ID, created vs reused, live-site check results (dataLayer name, `store.snapchat_pixel_id`, search frequency, `impressions` shape, bought-together outcome), the partial events, and that `gateway_url` was left untouched. **Do not publish.**

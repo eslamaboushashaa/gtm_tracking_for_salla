@@ -7,7 +7,7 @@ description: Use when asked to install, set up or audit the Meta (Facebook) Pixe
 
 ## Overview
 
-Every Salla store pushes the same dataLayer, so this build is fixed: eight Meta Pixel tags on the facebook "Meta Pixel" gallery template, each fed by exactly one Salla event. Nothing about events or field mapping needs asking — only the inputs below.
+Every Salla store pushes the same dataLayer, so this build is fixed: seven Meta Pixel tags on the facebook "Meta Pixel" gallery template, each fed by exactly one Salla event. Nothing about events or field mapping needs asking — only the inputs below.
 
 The Salla dataLayer, the shared `EA - Core` foundation, every GTM payload and the post-publish checklist live in `reference.md` (the REFERENCE section below if this is a pasted prompt). Read it before Step 1.
 
@@ -31,7 +31,6 @@ If any is missing: ask for it and **stop**. No GTM reads, no browsing.
 | `EA - Meta Pixel - AddToWishlist` | AddToWishlist | `Product Added to Wishlist` (success = true) | event only — Salla sends no product |
 | `EA - Meta Pixel - AddToCart` | AddToCart | `Product Added` | full |
 | `EA - Meta Pixel - InitiateCheckout` | InitiateCheckout | `checkout::started` | value + currency only |
-| `EA - Meta Pixel - AddPaymentInfo` | AddPaymentInfo | `payments::apple-pay.start-transaction` | Apple Pay only |
 | `EA - Meta Pixel - Purchase` | Purchase | `Order Completed` | full, `eventId` = order ID |
 
 Plus, only if the store needs it: `EA - Meta Pixel - AddToCart - Bought Together` (reference: bought-together check).
@@ -42,6 +41,7 @@ Fixed decisions — do not re-litigate:
 - Advanced Matching sends the **plain** `customer.email` and `customer.phone`; `fbq` hashes them itself.
 - `optInMetaCAPI` = `false` and `consent` = `true` on every tag.
 - AddToWishlist carries no product data. Never fill it from `0.id`.
+- **No payment-info event.** Salla pushes `payments::apple-pay.start-transaction` only for Apple Pay's "Pay now"; card and mada payments send nothing. AddPaymentInfo built on it would count a fraction of payments, so it is deliberately not built.
 
 ## Workflow
 

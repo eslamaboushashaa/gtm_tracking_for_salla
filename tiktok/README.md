@@ -12,7 +12,6 @@ Every Salla store pushes the same dataLayer, so the build is fixed. The agent fi
 | AddToWishlist | `Product Added to Wishlist` |
 | AddToCart | `Product Added` |
 | InitiateCheckout | `checkout::started` |
-| AddPaymentInfo | `payments::apple-pay.start-transaction` (Apple Pay only) |
 | Purchase (or CompletePayment) | `Order Completed` |
 
 ## What is here
@@ -52,6 +51,7 @@ Then ask Claude Code to set up the TikTok Pixel for a Salla store.
 - Add-to-cart value is price × quantity, because Salla leaves a stale `value` in the dataLayer.
 - Wishlist events are sent without product data, because Salla's push has none — never with a guessed product.
 - Nothing reads the customer's name or the Apple Pay payment token.
+- No payment-info event: Salla only signals it for Apple Pay, so it would count a fraction of payments.
 - TikTok's template does not load the pixel, so a Custom HTML base tag is built first.
 - The Purchase event name is read from the installed template (TikTok renamed CompletePayment to Purchase in May 2025).
 - With no real Pixel ID the tags are built paused, never live with a fake ID.

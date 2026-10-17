@@ -4,7 +4,7 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 
 ## WHAT YOU ARE BUILDING (fixed spec)
 
-**8 tags** on the installed facebook "Meta Pixel" gallery template (+1 conditional, see Step 8c):
+**7 tags** on the installed facebook "Meta Pixel" gallery template (+1 conditional, see Step 8c):
 
 | Tag name | Meta event | Fires on (Salla dataLayer event) | Data coverage |
 |---|---|---|---|
@@ -14,7 +14,6 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 | `EA - Meta Pixel - AddToWishlist` | AddToWishlist | `Product Added to Wishlist` (success = true) | ⚠️ event only — **Salla sends no product data** |
 | `EA - Meta Pixel - AddToCart` | AddToCart | `Product Added` | ✅ full |
 | `EA - Meta Pixel - InitiateCheckout` | InitiateCheckout | `checkout::started` | ⚠️ value + currency only — no product IDs in this push |
-| `EA - Meta Pixel - AddPaymentInfo` | AddPaymentInfo | `payments::apple-pay.start-transaction` | ⚠️ Apple Pay only |
 | `EA - Meta Pixel - Purchase` | Purchase | `Order Completed` | ✅ full |
 | *(conditional)* `EA - Meta Pixel - AddToCart - Bought Together` | AddToCart | `salla-bought-together::product.added` | only if the bought-together check fails |
 
@@ -40,7 +39,7 @@ Checked against Meta's official standard events reference. For each standard eve
 | AddToWishlist | `Product Added to Wishlist` | ⚠️ Build — the push is only `{status: 201, success: true}`; all Meta properties are optional for this event, so it is valid without them |
 | AddToCart | `Product Added` | ✅ Build — no currency in the push (fallback handles it), quantity is a string |
 | InitiateCheckout | `checkout::started` | ⚠️ Build — value/currency only |
-| AddPaymentInfo | `payments::apple-pay.start-transaction` | ⚠️ Build — Apple Pay's "Pay now" only |
+| AddPaymentInfo | `payments::apple-pay.start-transaction` | ❌ Not built — Salla only pushes it for Apple Pay's "Pay now"; card and mada payments send nothing, so the event would count a fraction of payments and mislead optimisation |
 | Purchase | `Order Completed` | ✅ Build |
 | CompleteRegistration | — | ❌ `auth::logged.in` is a **login**; Salla's OTP flow doesn't distinguish new signups |
 | Lead | — | ❌ No lead-capture event |
@@ -143,7 +142,7 @@ dataLayer.push({
 2. **Salla never clears `"0"` between pushes.** GTM merges each push into its data model, so a field from an earlier push survives into a later one unless overwritten. Example: `0.value` from `Product Viewed` is still there when `Product Added` fires. **Always compute from fields present in the current push** — add-to-cart value is `price × quantity`, never `0.value`.
 3. `Product Added` has **no currency** and sends **quantity as a string** (`"1"`). Cast with `Number()`.
 4. `checkout::started` carries **no product IDs or items**.
-5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**.
+5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**. That is why no skill in this repo builds a payment-info event (AddPaymentInfo / ADD_BILLING): it would count only Apple Pay buyers.
 6. **Three things look like a purchase — build on exactly one:** `Order Completed`. Never also `purchase` (legacy push) or `mobile::order.placed` (fired 27× in one test session).
 7. The `customer` object arrives only in the `purchase` push, which fires *before* `Order Completed` on the same page, so its fields are still in the data model when Order Completed fires. On product/cart/search pages the customer fields are normally **undefined** — expected.
 8. Salla sends email/phone **plain and hashed**. Verified by hashing sample values: `email_hashed` = SHA-256 of the lowercased email; `phone_hashed` = SHA-256 of the digits with country code and no `+` (`966…`); `phone_with_plus_hashed` = SHA-256 of `+966…`. `first_name`/`last_name` are **already SHA-256** with unverified normalisation (no plain version). `customer.name` is the plain full name — **never send it anywhere.**
@@ -177,7 +176,6 @@ All Salla skills in this repo use these **exact names**. Whichever runs first cr
 | `EA - Core - salla_item_currency` | `0.currency` | all |
 | `EA - Core - salla_event_currency` | `currency` | all |
 | `EA - Core - salla_checkout_value` | `value` | all |
-| `EA - Core - salla_payment_amount` | `amount` | Meta, TikTok, Snap |
 | `EA - Core - salla_order_id` | `0.order_id` | all |
 | `EA - Core - salla_order_prices_total` | `0.prices.total` | all |
 | `EA - Core - salla_order_subtotal` | `0.subtotal` | all |
@@ -294,7 +292,6 @@ Name a new trigger `EA - Trigger - <dataLayer event name>`. Reuse an existing on
 | `EA - Trigger - Product Viewed` | `Product Viewed` | — | all |
 | `EA - Trigger - Product Added` | `Product Added` | — | all |
 | `EA - Trigger - checkout::started` | `checkout::started` | — | all |
-| `EA - Trigger - payments::apple-pay.start-transaction` | `payments::apple-pay.start-transaction` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Order Completed` | `Order Completed` | `{{EA - Core - salla_order_id}}` matches RegEx `^\d+$` | all |
 | `EA - Trigger - Products Searched` | `Products Searched` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Product Added to Wishlist` | `Product Added to Wishlist` | `{{EA - Core - salla_success}}` equals `true` | Meta, TikTok, Snap |
@@ -378,7 +375,7 @@ In the browser tool, on the live store (skip this step if no browser tool is ava
 `EA - Meta Pixel`; `EA - Core` if missing.
 
 ### Step 6 — Salla foundation
-Create what Meta uses from the foundation and is missing: all DLVs marked *all* / *Meta*, `EA - Core - salla_success`, the constant, the non-conditional Custom JS, and the triggers `Product Viewed`, `Product Added`, `checkout::started`, `payments::apple-pay.start-transaction`, `Order Completed`, `Products Searched`, `Product Added to Wishlist`. Conditional items only per the bought-together check.
+Create what Meta uses from the foundation and is missing: all DLVs marked *all* / *Meta*, `EA - Core - salla_success`, the constant, the non-conditional Custom JS, and the triggers `Product Viewed`, `Product Added`, `checkout::started`, `Order Completed`, `Products Searched`, `Product Added to Wishlist`. Conditional items only per the bought-together check.
 
 ### Step 7 — Meta variables (folder `EA - Meta Pixel`)
 
@@ -458,7 +455,6 @@ Each `objectPropertyList` row:
 | AddToWishlist | `AddToWishlist` | `Product Added to Wishlist` | *(omit `objectPropertyList` — no product data exists)* |
 | AddToCart | `AddToCart` | `Product Added` | content_type=`product`, content_ids=`{{EA - Core - salla_product_ids}}`, contents=`{{EA - Meta Pixel - product_contents}}`, content_name=`{{EA - Core - salla_product_name}}`, currency=`{{EA - Core - salla_currency}}`, value=`{{EA - Core - salla_add_to_cart_value}}` |
 | InitiateCheckout | `InitiateCheckout` | `checkout::started` | currency=`{{EA - Core - salla_currency}}`, value=`{{EA - Core - salla_checkout_value}}` |
-| AddPaymentInfo | `AddPaymentInfo` | `payments::apple-pay.start-transaction` | currency=`{{EA - Core - salla_currency}}`, value=`{{EA - Core - salla_payment_amount}}` |
 | Purchase | `Purchase` | `Order Completed` | content_type=`product`, content_ids=`{{EA - Core - salla_order_item_ids}}`, contents=`{{EA - Meta Pixel - order_contents}}`, num_items=`{{EA - Core - salla_order_num_items}}`, currency=`{{EA - Core - salla_currency}}`, value=`{{EA - Core - salla_order_value}}` |
 
 Purchase only — extra top-level parameter:
@@ -470,7 +466,6 @@ Notes to put on the partial tags:
 - Search: *"search_string only. Salla doesn't push the result product IDs, so Advantage+ catalog ads can't use this event."*
 - AddToWishlist: *"Salla's wishlist push has no product data. Deliberately NOT enriched from 0.id - on category pages that would attach the wrong product."*
 - InitiateCheckout: *"checkout::started carries no product IDs; content_ids/contents deliberately absent."*
-- AddPaymentInfo: *"Apple Pay 'Pay now' only. Card and mada payments produce no payment-info event."*
 
 ### Step 8c — CONDITIONAL: bought-together AddToCart
 Only if the bought-together check showed **no** `Product Added`. Create `EA - Meta Pixel - bt_contents` (folder Meta):
@@ -484,7 +479,7 @@ function() {
 Tag `EA - Meta Pixel - AddToCart - Bought Together`, `standardEventName` `AddToCart`, trigger `salla-bought-together::product.added`, properties: content_type=`product`, content_ids=`{{EA - Core - salla_bt_product_ids}}`, contents=`{{EA - Meta Pixel - bt_contents}}`, content_name=`{{EA - Core - salla_bt_product_name}}`, currency=`{{EA - Core - salla_currency}}`, value=`{{EA - Core - salla_bt_product_price}}`. Quantity is assumed 1 — the widget push has no added-quantity field (`0.product.quantity` is stock, not cart quantity).
 
 ### Step 9 — Verify
-`gtm_folder action=entities` on both folders. Confirm 8 tags (9 with the conditional) and every variable/trigger is foldered. Check **every `{{...}}` string in every tag matches a variable that exists** (GTM resolves by name and fails silently). Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
+`gtm_folder action=entities` on both folders. Confirm 7 tags (8 with the conditional) and every variable/trigger is foldered. Check **every `{{...}}` string in every tag matches a variable that exists** (GTM resolves by name and fails silently). Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
 
 ### Step 10 — Report and stop
 State: IDs used, template ID, created vs reused, live-site check results (dataLayer name, native pixel, search frequency, bought-together outcome), the partial events and why, the optional `Contact` (WhatsApp click) extra, and that `content_ids` must be verified against the catalog. **Do not publish.**

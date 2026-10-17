@@ -13,7 +13,7 @@ You are setting up the TikTok Pixel on a Salla store through Google Tag Manager.
 
 ## Overview
 
-Every Salla store pushes the same dataLayer, so this build is fixed: one Custom HTML base tag plus seven event tags on TikTok's official gallery template, each fed by exactly one Salla event. Nothing about events or field mapping needs asking — only the inputs below.
+Every Salla store pushes the same dataLayer, so this build is fixed: one Custom HTML base tag plus six event tags on TikTok's official gallery template, each fed by exactly one Salla event. Nothing about events or field mapping needs asking — only the inputs below.
 
 The Salla dataLayer, the shared `EA - Core` foundation, every GTM payload and the post-publish checklist live in the REFERENCE section at the end of this prompt. Read it before Step 1.
 
@@ -37,7 +37,6 @@ Account or container missing: ask and **stop**. Pixel ID missing: ask once; if t
 | `EA - TikTok Pixel - AddToWishlist` | AddToWishlist | `Product Added to Wishlist` (success = true) | event only — Salla sends no product |
 | `EA - TikTok Pixel - AddToCart` | AddToCart | `Product Added` | full |
 | `EA - TikTok Pixel - InitiateCheckout` | InitiateCheckout | `checkout::started` | value + currency only |
-| `EA - TikTok Pixel - AddPaymentInfo` | AddPaymentInfo | `payments::apple-pay.start-transaction` | Apple Pay only |
 | `EA - TikTok Pixel - Purchase` | Purchase (or CompletePayment) | `Order Completed` | full, `order_id` + `event_id` = order ID |
 
 Plus, only if the store needs it: `EA - TikTok Pixel - AddToCart - Bought Together` (reference: bought-together check).
@@ -49,6 +48,7 @@ Fixed decisions — do not re-litigate:
 - Advanced Matching in **plain** mode (`hash: "non-hashed"`) with `customer.email` and `customer.phone_with_plus`; TikTok hashes them itself.
 - Purchase value = `0.prices.total`, the amount paid including shipping.
 - AddToWishlist carries no product data. Never fill it from `0.id`.
+- **No payment-info event.** Salla pushes `payments::apple-pay.start-transaction` only for Apple Pay's "Pay now"; card and mada payments send nothing. AddPaymentInfo built on it would count a fraction of payments, so it is deliberately not built.
 
 ## Workflow
 
@@ -97,7 +97,7 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 
 ## WHAT YOU ARE BUILDING (fixed spec)
 
-**1 base tag + 7 event tags** (+1 conditional, Step 8c). Event tags use the installed TikTok gallery template (`tiktok/gtm-template-pixel`).
+**1 base tag + 6 event tags** (+1 conditional, Step 8c). Event tags use the installed TikTok gallery template (`tiktok/gtm-template-pixel`).
 
 | Tag name | TikTok event | Fires on (Salla dataLayer event) | Data coverage |
 |---|---|---|---|
@@ -107,7 +107,6 @@ Salla dataLayer shapes were captured from live Salla stores in 2026; every ID an
 | `EA - TikTok Pixel - AddToWishlist` | AddToWishlist | `Product Added to Wishlist` (success = true) | ⚠️ event only — no product data |
 | `EA - TikTok Pixel - AddToCart` | AddToCart | `Product Added` | ✅ full |
 | `EA - TikTok Pixel - InitiateCheckout` | InitiateCheckout | `checkout::started` | ⚠️ value + currency only |
-| `EA - TikTok Pixel - AddPaymentInfo` | AddPaymentInfo | `payments::apple-pay.start-transaction` | ⚠️ Apple Pay only |
 | `EA - TikTok Pixel - Purchase` | **Purchase** (or CompletePayment — see below) | `Order Completed` | ✅ full |
 | *(conditional)* `EA - TikTok Pixel - AddToCart - Bought Together` | AddToCart | `salla-bought-together::product.added` | only if the bought-together check fails |
 
@@ -117,7 +116,7 @@ Fixed decisions — do not re-litigate:
 - **Purchase event name.** TikTok renamed `CompletePayment` → **`Purchase`** for web on 1 May 2025; legacy `CompletePayment` is auto-converted and supported indefinitely. Read the installed template's event dropdown (Step 3): use `Purchase` if offered, otherwise `CompletePayment`. Never type a value the dropdown doesn't contain.
 - **Search term is sent twice:** in the template's `query` field (what the template natively forwards) **and** as an Additional Property `search_string` (the name TikTok's current docs use). Same value, so either naming is covered.
 - **Advanced Matching in PLAIN mode** (`hash: "non-hashed"`) with `customer.email` and `customer.phone_with_plus`. TikTok hashes and normalises them itself. *Plain mode is right for Salla specifically:* hashed mode is only needed when a store sends a pre-hashed `external_id` (Zid does), and Salla has no `external_id`.
-- **Manual contents**: `enhance_ecomm: false`. `single_multi_product: "multiple"` on ViewContent / AddToCart / Purchase; `"empty"` on Search / AddToWishlist / InitiateCheckout / AddPaymentInfo.
+- **Manual contents**: `enhance_ecomm: false`. `single_multi_product: "multiple"` on ViewContent / AddToCart / Purchase; `"empty"` on Search / AddToWishlist / InitiateCheckout.
 - Purchase value = `0.prices.total` (amount paid incl. shipping). `order_id` and `event_id` = `0.order_id`.
 - AddToWishlist is sent **without** product data — never borrowed from `0.id` (fact #14).
 
@@ -135,7 +134,7 @@ Checked against TikTok's standard events & parameters article and its May-2025 u
 | AddToWishlist | `Product Added to Wishlist` | ⚠️ Build — no product data in Salla's push |
 | AddToCart | `Product Added` | ✅ Build |
 | InitiateCheckout | `checkout::started` | ⚠️ Build — value/currency only |
-| AddPaymentInfo | `payments::apple-pay.start-transaction` | ⚠️ Build — Apple Pay only |
+| AddPaymentInfo | `payments::apple-pay.start-transaction` | ❌ Not built — Salla only pushes it for Apple Pay's "Pay now"; card and mada payments send nothing, so the event would count a fraction of payments and mislead optimisation |
 | Purchase (formerly CompletePayment) | `Order Completed` | ✅ Build |
 | CompleteRegistration | — | ❌ `auth::logged.in` is a login; signup vs login can't be told apart |
 | Lead / SubmitForm | — | ❌ No lead event. `gtm.formSubmit` is generic GTM form noise |
@@ -240,7 +239,7 @@ dataLayer.push({
 2. **Salla never clears `"0"` between pushes.** GTM merges each push into its data model, so a field from an earlier push survives into a later one unless overwritten. Example: `0.value` from `Product Viewed` is still there when `Product Added` fires. **Always compute from fields present in the current push** — add-to-cart value is `price × quantity`, never `0.value`.
 3. `Product Added` has **no currency** and sends **quantity as a string** (`"1"`). Cast with `Number()`.
 4. `checkout::started` carries **no product IDs or items**.
-5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**.
+5. `payments::apple-pay.start-transaction` fires only for Apple Pay's "Pay now" (often `checkout_type: "buy_now"`). Card and mada payments produce **no payment-info event**. That is why no skill in this repo builds a payment-info event (AddPaymentInfo / ADD_BILLING): it would count only Apple Pay buyers.
 6. **Three things look like a purchase — build on exactly one:** `Order Completed`. Never also `purchase` (legacy push) or `mobile::order.placed` (fired 27× in one test session).
 7. The `customer` object arrives only in the `purchase` push, which fires *before* `Order Completed` on the same page, so its fields are still in the data model when Order Completed fires. On product/cart/search pages the customer fields are normally **undefined** — expected.
 8. Salla sends email/phone **plain and hashed**. Verified by hashing sample values: `email_hashed` = SHA-256 of the lowercased email; `phone_hashed` = SHA-256 of the digits with country code and no `+` (`966…`); `phone_with_plus_hashed` = SHA-256 of `+966…`. `first_name`/`last_name` are **already SHA-256** with unverified normalisation (no plain version). `customer.name` is the plain full name — **never send it anywhere.**
@@ -274,7 +273,6 @@ All Salla skills in this repo use these **exact names**. Whichever runs first cr
 | `EA - Core - salla_item_currency` | `0.currency` | all |
 | `EA - Core - salla_event_currency` | `currency` | all |
 | `EA - Core - salla_checkout_value` | `value` | all |
-| `EA - Core - salla_payment_amount` | `amount` | Meta, TikTok, Snap |
 | `EA - Core - salla_order_id` | `0.order_id` | all |
 | `EA - Core - salla_order_prices_total` | `0.prices.total` | all |
 | `EA - Core - salla_order_subtotal` | `0.subtotal` | all |
@@ -391,7 +389,6 @@ Name a new trigger `EA - Trigger - <dataLayer event name>`. Reuse an existing on
 | `EA - Trigger - Product Viewed` | `Product Viewed` | — | all |
 | `EA - Trigger - Product Added` | `Product Added` | — | all |
 | `EA - Trigger - checkout::started` | `checkout::started` | — | all |
-| `EA - Trigger - payments::apple-pay.start-transaction` | `payments::apple-pay.start-transaction` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Order Completed` | `Order Completed` | `{{EA - Core - salla_order_id}}` matches RegEx `^\d+$` | all |
 | `EA - Trigger - Products Searched` | `Products Searched` | — | Meta, TikTok, Snap |
 | `EA - Trigger - Product Added to Wishlist` | `Product Added to Wishlist` | `{{EA - Core - salla_success}}` equals `true` | Meta, TikTok, Snap |
@@ -474,7 +471,7 @@ In the browser tool, on the live store (skip this step if no browser tool is ava
 `EA - TikTok Pixel`; `EA - Core` if missing.
 
 ### Step 6 — Salla foundation
-Create what TikTok uses and is missing: DLVs marked *all* / *TikTok*, `EA - Core - salla_success`, the constant, the non-conditional Custom JS, and the triggers `Product Viewed`, `Product Added`, `checkout::started`, `payments::apple-pay.start-transaction`, `Order Completed`, `Products Searched`, `Product Added to Wishlist`. Conditional items only per the bought-together check.
+Create what TikTok uses and is missing: DLVs marked *all* / *TikTok*, `EA - Core - salla_success`, the constant, the non-conditional Custom JS, and the triggers `Product Viewed`, `Product Added`, `checkout::started`, `Order Completed`, `Products Searched`, `Product Added to Wishlist`. Conditional items only per the bought-together check.
 
 ### Step 7 — TikTok variables (folder `EA - TikTok Pixel`)
 
@@ -561,7 +558,6 @@ On **Search** and **AddToWishlist** omit the `value` and `currency` rows — the
 | AddToWishlist | `AddToWishlist` | `Product Added to Wishlist` | `empty` | *(omit)* | *(omit)* | — |
 | AddToCart | `AddToCart` | `Product Added` | `multiple` | `{{EA - TikTok Pixel - product_contents}}` | `{{EA - Core - salla_add_to_cart_value}}` | — |
 | InitiateCheckout | `InitiateCheckout` | `checkout::started` | `empty` | *(omit)* | `{{EA - Core - salla_checkout_value}}` | — |
-| AddPaymentInfo | `AddPaymentInfo` | `payments::apple-pay.start-transaction` | `empty` | *(omit)* | `{{EA - Core - salla_payment_amount}}` | — |
 | Purchase | from Step 3 | `Order Completed` | `multiple` | `{{EA - TikTok Pixel - order_contents}}` | `{{EA - Core - salla_order_value}}` | `order_id` = `{{EA - Core - salla_order_id}}`, `event_id` = `{{EA - Core - salla_order_id}}` |
 
 Search's extra parameters:
@@ -594,7 +590,7 @@ function() {
 Tag `EA - TikTok Pixel - AddToCart - Bought Together`: event `AddToCart`, trigger `salla-bought-together::product.added`, `single_multi_product` `multiple`, contents `{{EA - TikTok Pixel - bt_contents}}`, value `{{EA - Core - salla_bt_product_price}}`. Quantity assumed 1 — the widget push carries no added-quantity field.
 
 ### Step 9 — Verify
-`gtm_folder action=entities` on both folders; 8 tags (9 with the conditional); every variable/trigger foldered; every `{{...}}` matches an existing variable. Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
+`gtm_folder action=entities` on both folders; 7 tags (8 with the conditional); every variable/trigger foldered; every `{{...}}` matches an existing variable. Paginate. Then run `gtm_workspace` `quickPreview` and search the (large) result for `compilerError`.
 
 ### Step 10 — Report and stop
 IDs, template ID, which Purchase name you used and why, created vs reused, live-site check results (dataLayer name, existing install, search frequency, bought-together outcome), the partial events, the optional Contact extra, that the base snippet needs diffing, and whether tags were left paused for a missing pixel ID. **Do not publish.**

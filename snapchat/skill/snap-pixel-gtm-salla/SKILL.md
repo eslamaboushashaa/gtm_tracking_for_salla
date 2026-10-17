@@ -7,7 +7,7 @@ description: Use when asked to install, set up or audit the Snapchat (Snap) Pixe
 
 ## Overview
 
-Every Salla store pushes the same dataLayer, so this build is fixed: ten Snap Pixel tags on Snap's official "Snap Pixel" gallery template, each fed by exactly one Salla event. Snap is the only platform here with standard events for list views and logins, so it uses two Salla events the others don't. Nothing about events or field mapping needs asking — only the inputs below.
+Every Salla store pushes the same dataLayer, so this build is fixed: nine Snap Pixel tags on Snap's official "Snap Pixel" gallery template, each fed by exactly one Salla event. Snap is the only platform here with standard events for list views and logins, so it uses two Salla events the others don't. Nothing about events or field mapping needs asking — only the inputs below.
 
 The Salla dataLayer, the shared `EA - Core` foundation, every GTM payload and the post-publish checklist live in `reference.md` (the REFERENCE section below if this is a pasted prompt). Read it before Step 1.
 
@@ -32,7 +32,6 @@ If any is missing: ask for it and **stop**. No GTM reads, no browsing.
 | `EA - Snap Pixel - ADD_TO_WISHLIST` | ADD_TO_WISHLIST | `Product Added to Wishlist` (success = true) | event only — Salla sends no product |
 | `EA - Snap Pixel - ADD_CART` | ADD_CART | `Product Added` | full |
 | `EA - Snap Pixel - START_CHECKOUT` | START_CHECKOUT | `checkout::started` | value + currency only |
-| `EA - Snap Pixel - ADD_BILLING` | ADD_BILLING | `payments::apple-pay.start-transaction` | Apple Pay only |
 | `EA - Snap Pixel - PURCHASE` | PURCHASE | `Order Completed` | full, `transaction_id` + `client_dedup_id` = order ID |
 | `EA - Snap Pixel - LOGIN` | LOGIN | `auth::logged.in` (success = true) | — |
 
@@ -44,6 +43,7 @@ Fixed decisions — do not re-litigate:
 - Advanced Matching sends **plain** `user_email` = `customer.email` and `user_phone_number` = `customer.phone`; Snap normalises and hashes them. Name and `external_id` fields stay empty — Salla has no plain name and no external ID.
 - Purchase value = `0.prices.total`, the amount paid including shipping.
 - ADD_TO_WISHLIST carries no product data. Never fill it from `0.id`.
+- **No payment-info event.** Salla pushes `payments::apple-pay.start-transaction` only for Apple Pay's "Pay now"; card and mada payments send nothing. ADD_BILLING built on it would count a fraction of payments, so it is deliberately not built.
 - **Never set `gateway_url`.**
 
 ## Workflow

@@ -13,7 +13,6 @@ Every Salla store pushes the same dataLayer, so the build is fixed. The agent fi
 | ADD_TO_WISHLIST | `Product Added to Wishlist` |
 | ADD_CART | `Product Added` |
 | START_CHECKOUT | `checkout::started` |
-| ADD_BILLING | `payments::apple-pay.start-transaction` (Apple Pay only) |
 | PURCHASE | `Order Completed` |
 | LOGIN | `auth::logged.in` |
 
@@ -54,6 +53,7 @@ Then ask Claude Code to set up the Snap Pixel for a Salla store.
 - Add-to-cart value is price × quantity, because Salla leaves a stale `value` in the dataLayer.
 - Wishlist events are sent without product data, because Salla's push has none — never with a guessed product.
 - Nothing reads the customer's name or the Apple Pay payment token.
+- No payment-info event: Salla only signals it for Apple Pay, so it would count a fraction of payments.
 - `item_ids` is always a real array of product IDs.
 - `gateway_url` is never set, so no Conversions API Gateway is implied.
 - Purchase carries `transaction_id` and `client_dedup_id` = order ID.
