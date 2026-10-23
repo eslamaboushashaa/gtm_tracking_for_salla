@@ -32,13 +32,29 @@ Both contain the same workflow. The prompt is the two skill files joined togethe
 2. OpenAI Pixel ID (Ads Manager → Conversions)
 3. Store URL (optional — used to confirm the container is the one on the store)
 
-## Install the skill (Claude Code)
+## Start in one message
+
+Connect your agent to a GTM MCP server first, then send it one line.
+
+**ChatGPT** (reads the prompt file and follows it in that chat):
+
+```text
+Read https://raw.githubusercontent.com/eslamaboushashaa/gtm_tracking_for_salla/main/chatgpt/chatgpt-ads-pixel-gtm-salla-prompt.md and follow it as your instructions for this chat.
+```
+
+**Claude Code** (installs the skill once):
+
+```text
+Install the skill from https://github.com/eslamaboushashaa/gtm_tracking_for_salla/tree/main/chatgpt/skill/chatgpt-ads-pixel-gtm-salla into ~/.claude/skills/
+```
+
+Or copy it yourself from a clone of this repo:
 
 ```bash
 cp -r skill/chatgpt-ads-pixel-gtm-salla ~/.claude/skills/
 ```
 
-Then ask Claude Code to set up the ChatGPT Ads pixel for a Salla store.
+Then ask it to set up the ChatGPT Ads pixel for your Salla store and give it the three inputs listed above.
 
 ## What the workflow gets right
 
