@@ -36,11 +36,13 @@ Both contain the same workflow. The prompt is the two skill files joined togethe
 
 Connect your agent to a GTM MCP server first, then send it one line.
 
-**ChatGPT** (reads the prompt file and follows it in that chat):
+**ChatGPT** (installs the skill once; open a new chat afterwards, because skills load when a chat starts):
 
 ```text
-Read https://raw.githubusercontent.com/eslamaboushashaa/gtm_tracking_for_salla/main/chatgpt/chatgpt-ads-pixel-gtm-salla-prompt.md and follow it as your instructions for this chat.
+Help me install the following skill into my personal ChatGPT skill directory: https://github.com/eslamaboushashaa/gtm_tracking_for_salla/tree/main/chatgpt/skill/chatgpt-ads-pixel-gtm-salla
 ```
+
+If your ChatGPT has no Skills, paste [`chatgpt-ads-pixel-gtm-salla-prompt.md`](chatgpt-ads-pixel-gtm-salla-prompt.md) into the chat instead: same workflow in one file.
 
 **Claude Code** (installs the skill once):
 
